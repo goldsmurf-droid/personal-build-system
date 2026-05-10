@@ -12,7 +12,7 @@ Personal build defaults for Ryan Goldberg. These apply to every personal project
 
 - **Local-first.** Runs on dev machine. No deploy step unless the problem requires remote access or always-on behavior.
 - **Tier 1 (VM):** Named host in `infra-defaults.md`. Deploy via git pull + systemd unit or simple process manager. No containers unless complexity justifies it.
-- **Tier 2 (cloud):** Deliberate choice only. Explicitly stated in spec.
+- **Tier 2 (cloud):** Deliberate choice only. Explicitly stated in spec. Default cloud target is Azure App Service, deployed via `/ship uat` from the project directory.
 
 ## Source control
 
