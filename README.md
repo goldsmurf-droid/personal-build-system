@@ -33,10 +33,28 @@ Built thing
 | `stack-defaults.md` | Your personal build defaults. Referenced by the Spec Builder. |
 | `infra-defaults.md` | Where and how things run. Fill in your real values after bootstrap. |
 | `spec-template.md` | The blank spec schema. Claude Code reference. |
+| `.claude/skills/ship.md` | Deploys a project to Azure App Service (`/ship uat`, `/ship live`) |
+| `.claude/skills/backlog.md` | Manages backlogs and build targets across projects (`/backlog`) |
+| `idea-capture-prompt.md` | Phase 0 Claude.ai Project prompt for mobile voice idea capture |
 
 ---
 
 ## Ignition sequence
+
+### Phase 0 — Ideation
+
+An idea arrives. Open the **Idea Capture** Claude Project on mobile and describe it — spoken or typed, rough or polished. The project responds with one structured idea card. Copy it.
+
+On your VM:
+
+```bash
+mkdir -p ~/projects/ideas
+# paste the idea card into ~/projects/ideas/<slug>.md
+```
+
+The card is your input to Phase 3. A note in your phone works too — the card format just makes Phase 3 faster.
+
+---
 
 ### Phase 1 — Capture
 
@@ -61,6 +79,26 @@ git init
 # paste SPEC.md content into SPEC.md
 git add SPEC.md
 git commit -m "spec: initial"
+```
+
+**Recommended path (superpowers — for anything non-trivial):**
+
+```bash
+cd ~/projects/active/<slug>
+claude
+```
+
+Then inside the Claude Code session:
+
+```
+/superpowers:brainstorming    ← structured design conversation → design doc
+/superpowers:writing-plans    ← step-by-step implementation plan
+/superpowers:executing-plans  ← executes the plan with review checkpoints
+```
+
+**Simple projects (one-shot, no design needed):**
+
+```bash
 claude "Read SPEC.md and build this. Write your assumptions and decisions to claude.md."
 ```
 
@@ -78,22 +116,44 @@ claude "Read SPEC.md. Fix the issue in Known issues: [X] only. Everything else i
 
 Working? Update `SPEC.md` frontmatter to `status: active`. Use it. When it stabilizes, `status: maintenance`.
 
+### Phase 7 — Ship (UAT)
+
+Ready for real users? Deploy to Azure App Service:
+
+```bash
+cd ~/projects/active/<slug>
+/ship uat
+```
+
+The skill provisions Azure resources, deploys your code, configures DNS, creates a cost budget, and writes the UAT URL back to `run.md`. Takes 3-5 minutes. Send the URL to someone who isn't you.
+
+### Phase 8 — Ship (Live)
+
+UAT passed? Add a dedicated production domain:
+
+```bash
+/ship live
+```
+
+No re-deploy. Same App Service, second custom domain.
+
 ---
 
 ## Iteration (bug fix or feature)
 
-1. Open `SPEC.md`.
-2. Add to `## Known issues` or `## Backlog`.
-3. Add `## Current build target` — one item only.
-4. Commit:
+1. Open `SPEC.md` directly, or manage items from anywhere with `/backlog`:
+   - `/backlog <slug> add "feature"` — adds to Backlog
+   - `/backlog <slug> bug "bug description"` — adds to Known Issues
+   - `/backlog <slug> target "what to build next"` — sets Current Build Target
+2. Commit the spec change:
    ```bash
    git commit -am "spec: iteration — <what you're doing>"
    ```
-5. Invoke Claude Code:
-   ```bash
-   claude "Read SPEC.md. Build the current build target only. Everything else is context."
-   ```
-6. Smoke test. Commit. Clear `## Current build target`.
+3. Build with the right superpowers skill for the job:
+   - New feature → `/superpowers:test-driven-development`
+   - Bug fix → `/superpowers:systematic-debugging`
+   - Done, ready to ship → `/superpowers:finishing-a-development-branch` then `/ship uat`
+4. Smoke test. Commit. Clear `## Current build target`.
 
 ---
 
