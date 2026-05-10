@@ -8,11 +8,12 @@
 
 ## Overview
 
-The existing pipeline takes an idea to a working product running on a dev VM. This design adds three missing pieces:
+The existing pipeline takes an idea to a working product running on a dev VM. The superpowers plugin (`superpowers@claude-plugins-official`) is the engine that powers the build phase — but it is currently undocumented, uninstalled by default, and unknown to anyone who forks this repo. This design adds four missing pieces:
 
-1. **`ship` skill** — one command from working-on-VM to deployed-on-Azure-App-Service, with DNS and cost management
-2. **`backlog` skill** — cross-project SPEC.md management for backlogs, bugs, and build targets
-3. **`idea-capture-prompt.md`** — a Phase 0 Claude.ai Project prompt for mobile voice ideation that produces consistent input into the pipeline
+1. **Superpowers integration** — install path, pipeline mapping, and explicit skill invocations wired into the README and onboarding
+2. **`ship` skill** — one command from working-on-VM to deployed-on-Azure-App-Service, with DNS and cost management
+3. **`backlog` skill** — cross-project SPEC.md management for backlogs, bugs, and build targets
+4. **`idea-capture-prompt.md`** — a Phase 0 Claude.ai Project prompt for mobile voice ideation that produces consistent input into the pipeline
 
 Plus the doc updates required to keep the repo usable by others.
 
@@ -38,16 +39,19 @@ personal-build-system/
 ### Updated files
 
 ```
+  full-bootstrap.sh     ← add superpowers install to "Next steps" output
   infra-defaults.md     ← add dns, cost, and registrar fields
-  README.md             ← add Phase 0, Phase 7, Phase 8; update iteration loop
-  ONBOARDING.md         ← add domain setup, DNS credentials, idea capture steps
+  README.md             ← add Phase 0, Phase 7, Phase 8; update Phase 4 invocation; update iteration loop
+  ONBOARDING.md         ← add superpowers install step, domain setup, DNS credentials, idea capture steps
 ```
 
 ### Design principles
 
-Both skills are Claude Code instruction documents — markdown files that tell Claude what to do. Claude drives the `az` CLI, DNS provider APIs, and file edits. No shell scripts, no daemons, no new runtime dependencies beyond the `az` CLI already required by `full-bootstrap.sh`.
+The `ship` and `backlog` skills are Claude Code instruction documents — markdown files that tell Claude what to do. Claude drives the `az` CLI, DNS provider APIs, and file edits. No shell scripts, no daemons, no new runtime dependencies beyond the `az` CLI already required by `full-bootstrap.sh`.
 
 Skills read configuration from `~/personal-build-system/infra-defaults.md`. This makes them portable: anyone who forks the repo and fills in their own `infra-defaults.md` gets working skills.
+
+Superpowers is a published plugin, not a file in this repo. This design documents it, wires it into the install path and pipeline, and treats it as a first-class dependency.
 
 ---
 
@@ -165,25 +169,31 @@ The iteration loop in `README.md` (currently manual edits to SPEC.md) is unchang
 
 All updates are required before this work is considered done. The repo is public and intended for others to fork — incomplete docs make the new features invisible.
 
+### `full-bootstrap.sh`
+
+- Update "Next steps" output: add step 3 for superpowers install (`/plugin install superpowers@claude-plugins-official` + `/reload-plugins`), renumber subsequent steps
+
 ### `infra-defaults.md`
 
 - Add `## DNS` section (fields above)
 - Add `## Cost` section (fields above)
-- Remove Namecheap-specific references from any hardcoded positions
+- Remove any Namecheap-specific references from hardcoded positions
 
 ### `README.md`
 
 - Add **Phase 0 — Capture** before Phase 1, referencing `idea-capture-prompt.md`
+- Update **Phase 4 — Ignition**: add superpowers skill invocations as the recommended path; keep raw `claude` invocation as fallback
 - Add **Phase 7 — Ship (UAT)**: `cd ~/projects/active/<slug>` then `/ship uat`
 - Add **Phase 8 — Ship (Live)**: `/ship live` once UAT passes
-- Update **Iteration** section: add `/backlog` as the CLI path for managing SPEC.md backlog/bugs
-- Add `/backlog` and `/ship` to the **What's in this repo** table
+- Update **Iteration** section: add `/backlog` and superpowers skill references for feature work and bug fixes
+- Update **What's in this repo** table: add `ship.md`, `backlog.md`, `idea-capture-prompt.md`
 
 ### `ONBOARDING.md`
 
-- Add a step between current steps 6 and 7: **Set up your domain and DNS credentials** — explains the three DNS provider options, how to get API credentials for Namecheap or Cloudflare, or how to use `manual` mode
+- Add **Step 5a — Install superpowers** immediately after Claude Code auth (see Section 6)
+- Add new step between current steps 6 and 7: **Set up your domain and DNS credentials** — explains the three DNS provider options, how to get API credentials for Namecheap or Cloudflare, or how to use `manual` mode
 - Add a step: **Try `/backlog`** after the first project is built
-- Mention `idea-capture-prompt.md` in the Claude Project setup step (Step 8): create a second project for idea capture, separate from the Spec Builder
+- Update Claude Project setup step: create two projects — Spec Builder (`spec-builder-prompt.md`) and Idea Capture (`idea-capture-prompt.md`)
 
 ---
 
@@ -235,6 +245,87 @@ An intake endpoint or minimal web UI accepting idea cards from a browser form or
 
 ---
 
+## Section 6 — Superpowers integration
+
+### What superpowers is
+
+Superpowers (`superpowers@claude-plugins-official`) is a Claude Code plugin that provides structured skills for the full build loop: brainstorming, writing plans, executing plans, test-driven development, systematic debugging, verification before completion, and finishing a development branch. It is the engine that makes Phase 4 work well. Without it, Phase 4 is a raw `claude` invocation with no structure.
+
+### Install path
+
+Superpowers cannot be installed via shell script — it is a Claude Code command. It must be installed interactively after Claude Code auth.
+
+`full-bootstrap.sh` "Next steps" output gets a new step between current steps 2 and 3:
+
+```
+  3. Install superpowers:
+       /plugin install superpowers@claude-plugins-official
+       /reload-plugins
+```
+
+`ONBOARDING.md` gets a dedicated step immediately after Step 5 (Claude Code auth):
+
+> **Step 5a — Install superpowers**
+> In your Claude Code session on the VM:
+> ```
+> /plugin install superpowers@claude-plugins-official
+> /reload-plugins
+> ```
+> This installs the skills that power the build phase. You only need to do this once per VM.
+
+### Pipeline mapping
+
+| Phase | Current invocation | With superpowers |
+|-------|--------------------|------------------|
+| Phase 4 — Ignition | `claude "Read SPEC.md and build this..."` | `claude` → `/superpowers:brainstorming` → `/superpowers:writing-plans` → `/superpowers:executing-plans` |
+| Phase 5 — Smoke test | manual | `/superpowers:verification-before-completion` before declaring done |
+| Iteration — new feature | edit SPEC.md, invoke claude | `/superpowers:test-driven-development` |
+| Iteration — bug fix | edit SPEC.md, invoke claude | `/superpowers:systematic-debugging` |
+| Iteration — ready to ship | manual | `/superpowers:finishing-a-development-branch` → `/ship uat` |
+
+### How our skills interlock with superpowers
+
+```
+idea-capture-prompt.md (Phase 0)
+        ↓
+spec-builder-prompt.md (Phase 3, Claude.ai)
+        ↓
+/superpowers:brainstorming  ← design
+/superpowers:writing-plans  ← implementation plan
+/superpowers:executing-plans ← build
+/superpowers:verification-before-completion ← done check
+        ↓
+/superpowers:finishing-a-development-branch
+        ↓
+/ship uat  ← our skill: first external deploy
+        ↓
+UAT passes
+        ↓
+/ship live  ← our skill: production
+        ↑
+/backlog  ← our skill: manages the loop between phases
+```
+
+Superpowers owns the build loop. Our skills own the lifecycle on either side of it.
+
+### README Phase 4 update
+
+The current invocation:
+```bash
+claude "Read SPEC.md and build this. Write your assumptions and decisions to claude.md."
+```
+
+Becomes:
+```bash
+claude
+# then in the session:
+# /superpowers:brainstorming   ← starts the design conversation
+```
+
+The raw invocation still works and is kept as a fallback for simple projects. The superpowers path is the recommended path for anything non-trivial.
+
+---
+
 ## Out of scope
 
 - Multi-user or team features
@@ -251,7 +342,9 @@ An intake endpoint or minimal web UI accepting idea cards from a browser form or
 - `.claude/skills/backlog.md` exists and is accurate
 - `idea-capture-prompt.md` exists and produces the correct output format when pasted into a Claude Project
 - `infra-defaults.md` has DNS and Cost sections with correct field names
-- `README.md` has Phase 0, Phase 7, Phase 8, and updated iteration loop
-- `ONBOARDING.md` has domain/DNS setup step and idea capture step
+- `full-bootstrap.sh` "Next steps" output includes superpowers install instructions
+- `README.md` has Phase 0, updated Phase 4 (superpowers path), Phase 7, Phase 8, and updated iteration loop
+- `ONBOARDING.md` has superpowers install step, domain/DNS setup step, idea capture step, and two-project Claude setup
 - All new `.env.example` keys are documented
 - Repo is forkable and usable by someone who is not Ryan
+- A new user following ONBOARDING.md end-to-end has superpowers installed and knows how to use it before they start their first project
