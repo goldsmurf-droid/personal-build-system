@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # setup.sh — bootstrap personal-build-system
 # Run once on a new machine after cloning, or to initialize from scratch.
 # Usage: bash setup.sh [--remote git@github.com:YOU/personal-build-system.git]
