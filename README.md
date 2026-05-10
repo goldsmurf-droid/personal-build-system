@@ -2,6 +2,10 @@
 
 Lean idea-to-built-product pipeline for personal use. One conversation to spec, one command to build.
 
+**New here?** See [ONBOARDING.md](ONBOARDING.md) to make this yours.
+
+---
+
 ## What this is
 
 A small system that takes an idea ("I want a thing that does X") and produces a working built thing, with the minimum viable structure between the two.
@@ -23,61 +27,98 @@ Built thing
 | File | Purpose |
 |------|---------|
 | `README.md` | This file. System overview + ignition sequence. |
-| `spec-builder-prompt.md` | Paste this into Claude to start a new project. |
-| `stack-defaults.md` | Your personal build defaults. Referenced by the spec builder. |
-| `infra-defaults.md` | Where and how things run. Referenced by the spec builder. |
+| `ONBOARDING.md` | How to fork and make this yours on a fresh Azure account. |
+| `full-bootstrap.sh` | Creates and provisions your Azure dev VM. Run once per machine. |
+| `spec-builder-prompt.md` | Paste into a Claude Project as the system prompt. This is the Spec Builder. |
+| `stack-defaults.md` | Your personal build defaults. Referenced by the Spec Builder. |
+| `infra-defaults.md` | Where and how things run. Fill in your real values after bootstrap. |
 | `spec-template.md` | The blank spec schema. Claude Code reference. |
+
+---
 
 ## Ignition sequence
 
-### New project
+### Phase 1 — Capture
 
-1. Open Claude. Use a saved Project with `spec-builder-prompt.md` pre-loaded as the system prompt — or paste it manually at the start of a new conversation.
-2. Drop your idea. One paragraph, however rough.
-3. Spec Builder interrogates you. Six exchanges max.
-4. Spec Builder outputs a `SPEC.md` block. Skim it — 60 seconds. Confirm the slug and that nothing is obviously broken.
-5. Run:
-   ```bash
-   mkdir -p ~/projects/active/<slug>
-   cd ~/projects/active/<slug>
-   git init
-   # paste SPEC.md content into SPEC.md
-   git add SPEC.md
-   git commit -m "spec: initial"
-   ```
-6. Open Claude Code in that directory:
-   ```bash
-   claude "Read SPEC.md and build this. Write your assumptions and decisions to claude.md."
-   ```
-7. Go do something else. Come back when it's done.
-8. Run the smoke test described in `SPEC.md`.
+You have an idea. You're driving, walking, in the shower. Open Claude mobile or drop a note. Don't spec it yet — just capture enough to reconstruct the idea later. One paragraph minimum. The artifact is a rough idea paragraph.
 
-### Iteration (bug fix or feature)
+### Phase 2 — Ready check
 
-1. Open `SPEC.md` in the project directory.
-2. Add or update `## Known issues` or `## Backlog` as appropriate.
+Before opening the Spec Builder, ask: can I describe the happy path end-to-end in one sentence? If no, keep thinking. If yes, proceed. The Spec Builder will expose gaps anyway — the ready check just prevents wasting a conversation on a half-baked idea.
+
+### Phase 3 — Spec Builder
+
+Open your Personal Build System Claude Project. Drop the idea paragraph. Let it interrogate you. Six exchanges max. At the end you have a `SPEC.md` block. Skim it — 60 seconds. Fix anything obviously wrong before saving. The spec is a contract; don't sign it with known errors.
+
+### Phase 4 — Ignition
+
+On your VM:
+
+```bash
+mkdir -p ~/projects/active/<slug>
+cd ~/projects/active/<slug>
+git init
+# paste SPEC.md content into SPEC.md
+git add SPEC.md
+git commit -m "spec: initial"
+claude "Read SPEC.md and build this. Write your assumptions and decisions to claude.md."
+```
+
+Go do something else. Come back when it's done.
+
+### Phase 5 — Smoke test
+
+Run the smoke test described in `SPEC.md`. Pass means shippable. Fail means: read `claude.md` to find the wrong assumption, fix the spec, re-invoke targeted:
+
+```bash
+claude "Read SPEC.md. Fix the issue in Known issues: [X] only. Everything else is context."
+```
+
+### Phase 6 — Ship and transition
+
+Working? Update `SPEC.md` frontmatter to `status: active`. Use it. When it stabilizes, `status: maintenance`.
+
+---
+
+## Iteration (bug fix or feature)
+
+1. Open `SPEC.md`.
+2. Add to `## Known issues` or `## Backlog`.
 3. Add `## Current build target` — one item only.
-4. Commit the updated spec:
+4. Commit:
    ```bash
    git commit -am "spec: iteration — <what you're doing>"
    ```
-5. Open Claude Code:
+5. Invoke Claude Code:
    ```bash
    claude "Read SPEC.md. Build the current build target only. Everything else is context."
    ```
-6. Smoke test. Commit.
+6. Smoke test. Commit. Clear `## Current build target`.
 
-### No local machine (cloud/VM flow)
+---
 
-The git remote is the handoff point. Claude Code cloud pushes; your VM pulls.
+## Development vs maintenance
 
+| Status | Meaning | Claude Code cadence |
+|--------|---------|-------------------|
+| `active` | Being built or actively iterated | Regular |
+| `maintenance` | Works, touch only when needed | Infrequent, targeted |
+| `archived` | Done or abandoned | Never |
+
+Transition to maintenance:
+
+```bash
+# update status: in SPEC.md frontmatter
+git commit -am "chore: transition to maintenance"
 ```
-Claude.ai (Spec Builder)  →  SPEC.md committed to repo
-Claude Code cloud         →  builds, pushes to remote
-VM                        →  pulls, runs
+
+Archive:
+
+```bash
+mv ~/projects/active/<slug> ~/projects/archive/<slug>-$(date +%Y%m%d)
 ```
 
-Every project has a `run.md` (generated by Claude Code) with SSH-in-and-go instructions. No assumed local environment.
+---
 
 ## Project folder structure
 
@@ -85,10 +126,10 @@ Every project has a `run.md` (generated by Claude Code) with SSH-in-and-go instr
 ~/projects/
   active/
     <slug>/
-      SPEC.md       ← source of truth
-      claude.md     ← Claude Code's assumptions/decisions log
-      run.md        ← how to run this from a fresh pull
-      README.md     ← generated by Claude Code
+      SPEC.md       <- source of truth
+      claude.md     <- Claude Code's assumptions/decisions log
+      run.md        <- how to run from a fresh pull
+      README.md     <- generated by Claude Code
       /src
       /tests
   archive/
@@ -101,13 +142,15 @@ Every project has a `run.md` (generated by Claude Code) with SSH-in-and-go instr
 - `SPEC.md` is always the source of truth. If the built thing and the spec disagree, the spec wins.
 - `claude.md` is your recovery surface. Read it first when something goes wrong.
 
+---
+
 ## In-flight view
 
 ```bash
 ls ~/projects/active/
 ```
 
-That's it until you have more than ~7 active projects. At that point, add a one-liner `status:` field to each `SPEC.md` frontmatter and run:
+That's enough until ~7 active projects. After that:
 
 ```bash
 for d in ~/projects/active/*/; do
@@ -115,27 +158,34 @@ for d in ~/projects/active/*/; do
 done
 ```
 
+---
+
 ## Failure mode recovery
 
 | Type | Symptom | Recovery |
 |------|---------|----------|
 | Wrong direction, caught early | Two steps in, already wrong | `git reset --hard`, fix spec, re-invoke |
 | Partially built, can't unwind | Tangled, don't want to throw away | `git checkout -b rebuild-v2`, fix spec, rebuild on branch |
-| Built wrong thing, found at smoke test | Spec was ambiguous, Claude Code chose wrong | Read `claude.md` to find the assumption, fix spec explicitly, re-invoke targeted section |
+| Built wrong thing, found at smoke test | Spec was ambiguous, Claude Code chose wrong | Read `claude.md`, fix spec explicitly, re-invoke targeted |
 
 **The rule:** fix the spec first, then fix the code. Never the other way around.
+
+---
 
 ## Updating your defaults
 
 - Build tech changed → edit `stack-defaults.md`
-- New machine or deploy pattern → edit `infra-defaults.md`
+- Infra changed → edit `infra-defaults.md`
 - Spec schema evolved → edit `spec-template.md`
 - Interrogation protocol changed → edit `spec-builder-prompt.md`
 
-## Portable / new machine setup
+---
+
+## New machine setup
 
 ```bash
-git clone <this repo> ~/personal-build-system
+git clone git@github.com:YOUR_USERNAME/personal-build-system.git ~/personal-build-system
+bash ~/personal-build-system/full-bootstrap.sh
 ```
 
-That's the whole system. Projects live separately under `~/projects/active/`.
+See [ONBOARDING.md](ONBOARDING.md) for the full walkthrough.
